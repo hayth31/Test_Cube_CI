@@ -234,8 +234,8 @@ rule is exercised by Pod units P007/P008, section A):
 - **Vision mode is not evaluated here.** It needs labelled photos in `data/input/<unit>/receiving/` and an API key
   (`RECEIVING_VISION=on`). Round 2's own tests cover the vision fusion logic with canned model output.
 - Pod units are few (10) and synthetic; the counts show behaviour on designed edge cases, not field accuracy.
-- Prep, Pack, Returns and Recovery are still **organiser stubs** in this repository; end-to-end outcomes depend on
-  their CSV-replay logic.
+- All five agents are integrated, but this report quantitatively scores only Receiving. Prep, Pack, Returns and
+  Recovery have contract, integration and end-to-end coverage; their field accuracy is not established by this dataset.
 - `components` is not checked in recorded mode (the receipt has only a `missing_components` flag, which
   `quality_flags` covers); see `payload.checks_not_performed` on each record.
 """

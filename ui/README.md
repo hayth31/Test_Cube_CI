@@ -4,7 +4,7 @@ A unified platform for the complete commerce operations workflow (Receiving, Pre
 
 Built with **React + Vite + Tailwind CSS** following the **Wellnessty** signature design system: alternating full-width color bands, hard offset shadows, ink borders, Young Serif typography, and high-contrast accessible states.
 
-> **Brand Name Configuration**: The brand name is configured in one central location: [`ui/src/config/brand.js`](file:///c:/Users/user/Desktop/cube-round3-pod/ui/src/config/brand.js) exporting `BRAND_NAME`. All components, navigation headers, page descriptions, footers, and HTML titles read dynamically from this constant.
+> **Brand Name Configuration**: The brand name is configured in one central location: [`src/config/brand.js`](src/config/brand.js) exporting `BRAND_NAME`. All components, navigation headers, page descriptions, footers, and HTML titles read dynamically from this constant.
 
 ---
 
@@ -43,8 +43,8 @@ Always paired with an icon and explicit text label:
 - **Workflow-Level Execution**: The orchestrator executes whole workflows, not single stages. On an agent's page, running a check invokes the pipeline for that unit, but the view isolates and renders only that stage's result and evidence.
 - **Preview-Only Visuals**: The orchestrator holds image captures for units internally; there is no image-upload endpoint in the API. File inputs are for operator preview only and prominently labeled as such.
 - **Authoritative Statuses & Outcomes**:
-  - Official statuses: `PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `BLOCKED`, `RECOVERY_REQUIRED` ([orchestration/domain.py:16-24](file:///c:/Users/user/Desktop/cube-round3-pod/orchestration/domain.py#L16-L24)).
-  - Official final outcomes: `CLEAN`, `EXCEPTION`, `CLAIM_RECOMMENDED`, `NEEDS_REVIEW`, `INCOMPLETE` ([orchestration/domain.py:27-35](file:///c:/Users/user/Desktop/cube-round3-pod/orchestration/domain.py#L27-L35)).
+  - Official statuses: `PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `BLOCKED`, `RECOVERY_REQUIRED` ([`orchestration/rollup.py`](../orchestration/rollup.py#L6)).
+  - Official final outcomes: `CLEAN`, `EXCEPTION`, `CLAIM_RECOMMENDED`, `NEEDS_REVIEW`, `INCOMPLETE` ([`orchestration/rollup.py`](../orchestration/rollup.py#L14)).
 - **UNCERTAIN Verdict**: An `UNCERTAIN` verdict is not a low-confidence `PASS`; when evidence is insufficient or occluded, the workflow halts with `needs_human: true` / `BLOCKED`, directing the unit to the Review Queue.
 
 ---
@@ -55,11 +55,11 @@ The UI connects exclusively to the orchestrator HTTP API (`orchestration/api.py`
 
 | Function | API Endpoint | Source Reference | Description |
 |---|---|---|---|
-| Execute Case | `POST /workflows` | [orchestration/api.py:42-49](file:///c:/Users/user/Desktop/cube-round3-pod/orchestration/api.py#L42-L49) | Dispatches case `{org_id, unit_id, route, returned}` and advances workflow. |
-| Workflow State | `GET /workflows/{id}` | [orchestration/api.py:59-62](file:///c:/Users/user/Desktop/cube-round3-pod/orchestration/api.py#L59-L62) | Returns authoritative workflow state. |
-| Evidence Bundle | `GET /workflows/{id}/evidence` | [orchestration/api.py:64-66](file:///c:/Users/user/Desktop/cube-round3-pod/orchestration/api.py#L64-L66) | Returns workflow state plus all stored immutable evidence records. |
-| Decision Override | `POST /workflows/{id}/overrides` | [orchestration/api.py:75-82](file:///c:/Users/user/Desktop/cube-round3-pod/orchestration/api.py#L75-L82) | Applies a human decision override (`record_id`, `new_verdict`, `actor`, `reason`). |
-| Resume Workflow | `POST /workflows/{id}/resume` | [orchestration/api.py:69-72](file:///c:/Users/user/Desktop/cube-round3-pod/orchestration/api.py#L69-L72) | Continues workflow execution after halt, override, or failure. |
+| Execute Case | `POST /workflows` | [`orchestration/api.py`](../orchestration/api.py#L62) | Dispatches case `{org_id, unit_id, route, returned}` and advances workflow. |
+| Workflow State | `GET /workflows/{id}` | [`orchestration/api.py`](../orchestration/api.py#L93) | Returns authoritative workflow state. |
+| Evidence Bundle | `GET /workflows/{id}/evidence` | [`orchestration/api.py`](../orchestration/api.py#L98) | Returns workflow state plus all stored immutable evidence records. |
+| Decision Override | `POST /workflows/{id}/overrides` | [`orchestration/api.py`](../orchestration/api.py#L110) | Applies a human decision override (`record_id`, `new_verdict`, `actor`, `reason`). |
+| Resume Workflow | `POST /workflows/{id}/resume` | [`orchestration/api.py`](../orchestration/api.py#L103) | Continues workflow execution after halt, override, or failure. |
 
 ---
 
@@ -102,7 +102,7 @@ python -m uvicorn orchestration.api:app --port 8100
 In a separate terminal:
 ```bash
 cd ui
-npm install
+npm ci
 npm run dev
 ```
 The application will be running locally at `http://localhost:5173/`.

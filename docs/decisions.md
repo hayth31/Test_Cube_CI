@@ -228,17 +228,9 @@ _Add entries below._
 - Why: Commercial priority requires surfacing recoverable revenue and physical defects before marking clean. Pure functions guarantee reproducibility.
 - Consequences: Workflow state is always derived and fully traceable; never dependent on mutable agent state.
 
-### D-123 · Prep agent stubbing isolation and procedure to swap in real Prep
+### D-123 · Integrate Prep with an offline-safe vision adapter
 - Date / Owner: 2026-10-10 / Pod (orchestration)
-- Context: Prep is not yet merged/integrated in Round 3. We must preserve complete workflow routing for FBA units without faking or fabricating Prep decisions.
-- Decision: Keep `agents/prep/` strictly as an `organiser-stub` (`implementation: "organiser-stub"` in `agent.json`). Every output includes `[STUB REPLAY]` in checks and detail. Recovery treats missing or stub Prep evidence as `SILENT` for inbound defect and prep fees.
-- How to swap in the real Prep agent:
-  1. Place the Round 2 Prep agent files into `agents/prep/` (or run it as an external HTTP microservice).
-  2. In `agents/prep/agent.json`:
-     - Change `"implementation"` from `"organiser-stub"` to `"real"`.
-     - Update `"owner"` with the Prep owner's GitHub handle.
-     - Set `"mode"`: `"inproc"` (with `handle` in `agents/prep/app.py`) or `"http"` (with endpoint URL).
-  3. Verify output matches `shared/schemas/agent-output.json` with valid `content_hash` and checks (`polybag_check`, `barcode_scannable`, `fragile_bubble_wrap`, etc.).
-  4. Run `pytest tests/integration/test_prep_handling.py` and `pytest tests/e2e/`.
-- Why: Absolute transparency. An organiser stub must never be disguised as a real autonomous agent.
-- Consequences: Prep swap-in is a clean, isolated 1-line change in `agent.json`.
+- Context: FBA workflows need real Prep evidence, while CI and judging must also run without external credentials.
+- Decision: Integrate the team Prep adapter in-process. Recorded sample observations are evaluated deterministically; image captures use one Gemini call only when `GEMINI_API_KEY` is present. Missing or inconclusive observations become `UNCERTAIN`, never invented evidence. Known cross-tenant sample subjects are rejected.
+- Why: This preserves the team agent's vision capability without making the pipeline, demo, or CI depend on a paid external service.
+- Consequences: Recovery can consume real Prep evidence. The offline test set measures decision logic, not image perception; live perception needs a separately labelled image evaluation.

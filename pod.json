@@ -11,7 +11,7 @@
     {
       "role": "Prep Manager",
       "agent": "prep",
-      "github": ""
+      "github": "jpatty-vin"
     },
     {
       "role": "Pack Manager",
@@ -29,6 +29,6 @@
       "github": "hayth31"
     }
   ],
-  "notes": "Pod 6 Round 3 Pod. Receiving, Pack, Returns, Recovery integrated. Prep is kept as organiser stub until Member 2 brings Round 2 agent in.",
+  "notes": "Pod 6 Round 3 Pod. Receiving, Prep, Pack, Returns and Recovery are integrated.",
   "orchestration_coordinator": "Orchestration Engineer"
 }

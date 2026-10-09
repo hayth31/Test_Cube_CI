@@ -26,7 +26,7 @@ from shared.utils.stubs import effective_verdict, previous
 
 STAGE = "recovery"
 AGENT_ID = "recovery@3.0.0"
-MODEL_ID = {"name": "recovery-evaluator", "version": "3.0.0", "provider": "pod6", "calls": 1, "cost_usd": 0.0}
+MODEL_ID = {"name": "recovery-evaluator", "version": "3.0.0", "provider": "pod6", "calls": 0, "cost_usd": 0.0}
 
 
 def position(line: dict, request: dict) -> tuple[str, str, list[str]]:

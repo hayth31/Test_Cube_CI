@@ -8,6 +8,10 @@ from shared.utils import sample_data
 MODEL_NAME = "gemini-2.5-flash"
 MODEL_PROVIDER = "google"
 PROMPT_VERSION = "3.0.0"
+SYSTEM_PROMPT = (
+    "You are an Amazon FBA prep compliance inspection assistant. "
+    "Analyze the images for polybag sealing, suffocation warning, barcode coverage, and label placement."
+)
 
 RULES = [
     ("polybag_sealed", "polybag_present_sealed", {"yes"}, {"not_sealed", "missing"}),
@@ -26,6 +30,13 @@ def verdict_from(value: str, ok: set, bad: set) -> str:
     return "UNCERTAIN"
 
 
+def _unit_in_sample(kind: str, unit_id: str) -> bool:
+    try:
+        return any(row["unit_id"] == unit_id for row in sample_data.rows(kind))
+    except Exception:
+        return False
+
+
 def validate_tenant_and_extract_refs(request: Dict[str, Any]) -> Tuple[List[str], Dict[str, Any]]:
     subject = request.get("subject", {})
     org_id = subject.get("org_id")
@@ -39,6 +50,11 @@ def validate_tenant_and_extract_refs(request: Dict[str, Any]) -> Tuple[List[str]
         r = sample_data.row("prep", subject_id, org_id)
     except LookupError:
         r = None
+
+    # Refuse a known sample subject owned by another organisation instead of
+    # falling through to a generic offline answer.
+    if r is None and (_unit_in_sample("prep", subject_id) or _unit_in_sample("receiving", subject_id)):
+        raise LookupError(f"subject {subject_id} belongs to another tenant")
 
     upstream_refs = []
     for ev in request.get("previous_evidence", []):
@@ -58,8 +74,12 @@ def call_gemini_vision(request: Dict[str, Any], sample_row: Dict[str, Any]) -> T
     inputs = request.get("inputs", [])
     context = request.get("context", {})
 
-    # Fallback to sample data replay if no live vision API key present
-    if not api_key:
+    usable_inputs = [item for item in inputs if os.path.isfile(item.get("ref", ""))]
+
+    # Use recorded observations when live vision is unavailable or there are no
+    # actual captures. A key alone must never turn a text-only prompt into visual
+    # evidence.
+    if not api_key or not usable_inputs:
         if sample_row:
             checks = []
             for key, col, ok, bad in RULES:
@@ -72,13 +92,18 @@ def call_gemini_vision(request: Dict[str, Any], sample_row: Dict[str, Any]) -> T
                         "detail": f"Sample dataset observation: {val}"
                     })
             price = float(sample_row.get("prep_price_usd", 0.50))
-            return checks, "csv-replay-stub", 10.0, price, None
+            return checks, "prep-r2-rules", 10.0, price, None
 
-        # Generic default pass fallback
+        # No observation source means unknown, never a synthetic PASS.
         return [
-            {"check_key": "polybag_sealed", "verdict": "PASS", "confidence": 0.98, "detail": "Polybag present and sealed."},
-            {"check_key": "suffocation_warning", "verdict": "PASS", "confidence": 0.95, "detail": "Suffocation warning legible."}
-        ], "mock-offline-engine", 10.0, 0.50, None
+            {
+                "check_key": "prep_observation",
+                "verdict": "UNCERTAIN",
+                "confidence": 0.0,
+                "detail": "No recorded Prep observation or readable image capture was supplied.",
+                "uncertain_reason": "insufficient_evidence",
+            }
+        ], "prep-r2-rules", 0.0, 0.50, None
 
     try:
         from google import genai
@@ -88,7 +113,7 @@ def call_gemini_vision(request: Dict[str, Any], sample_row: Dict[str, Any]) -> T
         pkg_type = context.get("packaging", "unspecified")
         parts = [f"Packaging Context: {pkg_type}\n\nPerform all relevant Amazon FBA prep compliance checks."]
 
-        for item in inputs:
+        for item in usable_inputs:
             ref_path = item.get("ref", "")
             if os.path.exists(ref_path):
                 with open(ref_path, "rb") as f:

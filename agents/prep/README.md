@@ -1,8 +1,8 @@
 # agents/prep/  ·  Prep Manager
 
-**Owner:** Member 2 (Prep Manager; none in Specialist Pods)  (set `owner` in `agent.json` and the handle in `.github/CODEOWNERS`)
+**Owner:** @jpatty-vin
 
-> **This folder currently contains an organiser stub** that replays the synthetic Round 2 CSV. It is *not* an agent. Replace it, then replace this README with one that describes what you actually built, how to run it, and its limits.
+This is the integrated Prep agent. It evaluates recorded observations with deterministic rules for reproducible offline runs and can analyze image captures with Gemini when `GEMINI_API_KEY` is present.
 
 | | |
 |---|---|
@@ -14,26 +14,18 @@
 
 **Specialist Pods have no Prep Manager: this folder is unused there** (the Specialist flow skips it). For Standard Pods: Recovery has asked Prep to record measured weight and dimensions in `payload.measurements`, because most sample fee lines are weight-tier fees with no evidence (finding F-07, see [`docs/decisions.md`](../../docs/decisions.md)). Look up Amazon's published prep requirements; do not infer them from the sample CSV. Your cost per check has to fit inside $0.40–$1.10 per unit.
 
-## Where your code goes
+## Implementation
 
 ```text
 agents/prep/
 ├── app.py          ← expose  handle(agent_input: dict) -> dict  (an Agent Output). Keep `app = make_app(...)` to serve over HTTP.
 ├── agent.json      ← stage · agent_id · owner · mode (inproc | http) · url · an honest `implementation` description
 ├── PROVENANCE.md   ← your Round 2 repo URL + commit this came from (create it)
-├── README.md       ← this file, rewritten
-└── …               ← your Round 2 code, prompts, rules, fixtures
+├── engine.py       ← tenant validation, rules and optional vision call
+└── README.md       ← operation and limits
 ```
 
-## Integrating, in order
-
-1. Read [`INTEGRATION-GUIDE.md`](../../INTEGRATION-GUIDE.md) and [`EVIDENCE-CONTRACT.md`](../../EVIDENCE-CONTRACT.md); open [`examples/end-to-end/`](../../examples/) for a real Agent Output.
-2. In `handle()`: read `request["subject"]`, `request["inputs"]` (your captures) and `request["previous_evidence"]`; run your agent (**one batched model call per unit**); build the record with `shared.utils.records.build_record()` and wrap it with `build_output()`.
-3. **Fail open.** On a model error return `pending_output(...)`, not an exception. Never invent evidence: if you did not see it, say UNCERTAIN with an `uncertain_reason`.
-4. **Refuse other tenants.** Raise `LookupError` (HTTP 404) for a subject that is not under `subject.org_id`.
-5. Make it idempotent: the same `request_id` must yield the same `record_id`. Use the **latest override** of previous evidence (`context.overrides`).
-6. Run `pytest tests/integration/test_agent_contracts.py`, first on the stub (it passes), then on yours, **with your own fixtures**.
-7. Run the whole system: `make run` and `make test`.
+The adapter reads the subject, captures and previous evidence, validates tenant boundaries, emits the shared Agent Output contract and seals records with a content hash. In offline mode it records `prep-r2-rules` and zero model calls. Live vision performs at most one batched call per unit and fails open to `UNCERTAIN` when evidence is insufficient.
 
 ## Run on its own
 
@@ -42,3 +34,9 @@ agents/prep/
 curl localhost:8102/health
 ```
 Then set `"mode": "http"` in `agent.json` if you want the orchestrator to call it over HTTP.
+
+## Limits
+
+- The ten Pod cases are synthetic and do not measure visual perception accuracy.
+- Live vision requires labelled images and `GEMINI_API_KEY`; CI intentionally runs offline.
+- Weight and dimensions are only available when present in the captured observations.

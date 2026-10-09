@@ -118,7 +118,7 @@ Every failure is **recorded and never becomes success**: a degraded evidence rec
 
 ### Our Pod's architecture
 
-> Status (2026-10-10): **Receiving, Pack, Returns and Recovery are integrated Round 2 agents. Prep is maintained strictly as an organiser stub** (`implementation: "organiser-stub"` in `agents/prep/agent.json`). Pod type: `standard`. Pod ID: `pod-06`.
+> Status (2026-10-10): **Receiving, Prep, Pack, Returns and Recovery are integrated. There are no active organiser stubs.** Pod type: `standard`. Pod ID: `pod-06`.
 
 ### 1. Diagram
 
@@ -137,7 +137,7 @@ Every failure is **recorded and never becomes success**: a degraded evidence rec
         │            │ fba          │ mfn          │ returned      │
         ▼            ▼              ▼              ▼               ▼
    Receiving ──▶   Prep  ─┐      Pack  ─┐       Returns ─┐      Recovery
-   (Round 2       (stub)  │      (Round 2│       (Round 2│      (Round 2; reads every
+   (Round 2       (rules +│      (Round 2│       (Round 2│      (Round 2; reads every
     rules +               └──────────────┴───────────────┴────▶ prior record +
     vision)                      rules)         rules)          fee report)
         │
@@ -150,10 +150,10 @@ Every failure is **recorded and never becomes success**: a degraded evidence rec
 | Stage | Implementation | Owner | Model calls | Notes |
 |---|---|---|---|---|
 | **Receiving** | **Round 2 agent** (`agents/receiving/`, [PROVENANCE](agents/receiving/PROVENANCE.md)): Round 2 `decision_engine.py` verbatim plus Round 2 `VisionService` | @Harish2300032959 | 0 (recorded mode) / 1 per unit (vision mode) | Rules decide every verdict. Mode declared in `model` and `payload.perception`. Supplier shortfalls tagged as `shortfall_side = "supplier"` (F-10). |
-| **Prep** | **Organiser stub** (CSV replay) | Organisers / Pending | 0 | Left as stub pending member integration. Clearly marked `[STUB REPLAY]` in checks and detail. Does not fabricate claims. |
-| **Pack** | **Round 2 agent** (`agents/pack/`, [PROVENANCE](agents/pack/PROVENANCE.md)): Round 2 packaging assessment engine | @Vaishali-39 | 0 (rule-based) | Validates SKU barcode, packaging type, hazmat, unsealed liquids. Issues `stop_and_fix` on severe packaging defects. |
-| **Returns** | **Round 2 agent** (`agents/returns/`, [PROVENANCE](agents/returns/PROVENANCE.md)): Round 2 return evaluation engine | @hayth31 | 0 (deterministic) | Evaluates return identity, completeness, condition grading, and disposition. Replays sample inputs cleanly when raw files are omitted. |
-| **Recovery** | **Round 2 agent** (`agents/recovery/`, [PROVENANCE](agents/recovery/PROVENANCE.md)): Round 2 audit & dispute engine | @B-Sumani | 0 (audit rules) | Consumes ALL accumulated prior evidence. Disallow false claims on supplier shortfalls (F-10) or missing Prep evidence (F-07). |
+| **Prep** | **Integrated Prep agent** (`agents/prep/`, [PROVENANCE](agents/prep/PROVENANCE.md)): deterministic rules plus optional Gemini vision | @jpatty-vin | 0 (offline rules) / 1 per unit (vision mode) | Checks polybag sealing, warnings, FNSKU placement, barcode coverage, expiry and handling marks. |
+| **Pack** | **Round 2 agent** (`agents/pack/`, [PROVENANCE](agents/pack/PROVENANCE.md)): Round 2 packaging assessment engine | @B-Sumani | 0 (rule-based) | Validates SKU barcode, packaging type, hazmat, unsealed liquids. Issues `stop_and_fix` on severe packaging defects. |
+| **Returns** | **Round 2 agent** (`agents/returns/`, [PROVENANCE](agents/returns/PROVENANCE.md)): Round 2 return evaluation engine | @Vaishali-39 | 0 (deterministic) | Evaluates return identity, completeness, condition grading, and disposition. Replays sample inputs cleanly when raw files are omitted. |
+| **Recovery** | **Round 2 agent** (`agents/recovery/`, [PROVENANCE](agents/recovery/PROVENANCE.md)): Round 2 audit & dispute engine | @hayth31 | 0 (audit rules) | Consumes ALL accumulated prior evidence. Disallows false claims on supplier shortfalls (F-10) or missing Prep evidence (F-07). |
 
 ### 3. Orchestration
 
@@ -180,17 +180,9 @@ The orchestrator (`orchestration/`) is the central control plane and single sour
   - Multi-tenancy is enforced in depth: in agent handlers (raising `AgentRejected` / `LookupError`), in orchestrator output validation (detecting `tenant_mismatch`), and at storage level (`MemoryStore` and `FileStore` strictly enforce `org_id` on reads and writes, raising `TenantViolation`).
   - The API requires `X-Org-Id` and returns 404 for missing or mismatched tenant records to prevent tenant enumeration.
 
-### 4. How to Swap in the Real Prep Agent
+### 4. Prep integration
 
-When the real Round 2 Prep agent is ready to be merged:
-1. Copy the Prep code into `agents/prep/` (or deploy as an HTTP service).
-2. Edit `agents/prep/agent.json`:
-   - Change `"implementation": "organiser-stub"` to `"implementation": "real"`.
-   - Update `"owner"` with the Prep owner's handle.
-   - Set `"mode": "inproc"` (with `handle(request)` defined in `agents/prep/app.py`) or `"mode": "http"` (with endpoint configuration).
-3. Ensure the Prep agent returns valid evidence with checks (`polybag_check`, `barcode_scannable`, `fragile_bubble_wrap`, etc.) and a SHA-256 sealed envelope.
-4. Recovery will automatically consume the real Prep evidence and un-silence inbound defect fee claims when Prep evidence contradicts Amazon charges.
-5. Verify with `pytest tests/integration/test_prep_handling.py` and `pytest tests/e2e/`.
+Prep is integrated in-process and returns contract-valid, SHA-256-sealed evidence. It evaluates recorded sample observations deterministically in CI and can use a single Gemini vision call when image captures and `GEMINI_API_KEY` are supplied. Recovery automatically consumes its evidence when deciding whether prep-related fees are supportable.
 
 ### 5. Failure model (what we break in the demo)
 
@@ -210,7 +202,7 @@ When the real Round 2 Prep agent is ready to be merged:
 
 ### 7. Known limits
 
-- **Prep is an organiser stub:** Prep stage remains a stub until integrated. It replays CSV rows, is labelled `organiser-stub`, and does not fabricate claims.
-- **Receiving vision mode:** Tested deterministically in recorded mode; live vision mode requires Gemini API credentials.
+- **Offline evaluation is not perception:** deterministic sample observations make CI reproducible, but do not measure real-world image-reading accuracy.
+- **Receiving vision mode:** Tested deterministically in recorded mode; live vision mode requires OpenAI API credentials.
 - **In-process thread cancellation:** Python cannot kill running threads; timed-out threads are orphaned and their delayed results discarded without corrupting store state.
 - **Storage locking scope:** File locks are process-safe on a single host (`msvcrt`/`fcntl`); multi-node deployments require distributed locking (e.g. Redis/PostgreSQL).

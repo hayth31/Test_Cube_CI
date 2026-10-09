@@ -13,16 +13,16 @@ Integrate the five independently built Round 2 agents into one connected, end-to
 ## What the Pod builds
 
 ```text
-Receiving → Prep → Pack → Returns → Recovery → Final Commerce Outcome
+Receiving → (Prep for FBA | Pack for MFN) → optional Returns → Recovery → Final Commerce Outcome
 ```
 
 | Member | Agent | Folder |
 |---|---|---|
-| 1 | Receiving Manager | `agents/receiving/` |
-| 2 | Prep Manager | `agents/prep/` |
-| 3 | Pack Manager | `agents/pack/` |
-| 4 | Returns Manager | `agents/returns/` |
-| 5 | Recovery Manager | `agents/recovery/` |
+| @Harish2300032959 | Receiving Manager | `agents/receiving/` |
+| @jpatty-vin | Prep Manager | `agents/prep/` |
+| @B-Sumani | Pack Manager | `agents/pack/` |
+| @Vaishali-39 | Returns Manager | `agents/returns/` |
+| @hayth31 | Recovery Manager | `agents/recovery/` |
 
 Each member owns one agent. The Pod jointly owns the orchestration, shared contracts, workflow state, integration, end-to-end testing, documentation, demo and submission. **No participant owns the final system alone.**
 
@@ -54,7 +54,13 @@ make case UNIT=UNIT-0014 ORG=org_demo_alpha     # one workflow, in full
 make serve            # orchestrator API on :8100 (POST /workflows, GET /workflows/{id} with X-Org-Id header, GET /health)
 ```
 
-Out of the box everything runs on **organiser stub agents** replaying the synthetic Round 2 CSVs. **Replacing a stub with your real agent is your job.**
+All five team agents are integrated behind the shared contract. For the team's labelled ten-case demo/evaluation set, run:
+
+```sh
+DATA_DIR=data/pod LOG_LEVEL=WARNING .venv/bin/python -m orchestration.run --all --cases data/pod/cases.json
+```
+
+The agents use deterministic/offline fallbacks when model credentials or image captures are absent, so CI and the demo remain reproducible. Live vision remains optional and is not part of the measured evaluation.
 
 Run an agent as its own service:
 
@@ -81,9 +87,9 @@ Copy `.env.example` to `.env`. **Never commit `.env`.**
 | `ORCH_FLOW` | Flow file for the API | the flow in `pod.json` |
 | `<STAGE>_URL` | Where an `http`-mode agent listens (`PREP_URL`, …) | `agent.json` `url` |
 | `OUT_DIR` | Where workflow state and evidence are written | `out` |
-| `DATA_DIR`, `INPUT_DIR` | Sample CSVs for the stubs; your per-stage captures | `data/sample`, `data/input` |
+| `DATA_DIR`, `INPUT_DIR` | Recorded evaluation data and per-stage captures | `data/sample`, `data/input` |
 | `LOG_LEVEL`, `LOG_FORMAT` | Logging | `WARNING`, `json` |
-| Model provider keys | Whatever *your* agents use (e.g. `ANTHROPIC_API_KEY`) | none |
+| Model provider keys | Optional live perception (for example `GEMINI_API_KEY` or `OPENAI_API_KEY`) | none |
 
 ## Example end-to-end workflow
 
@@ -100,7 +106,7 @@ Recovery   RCY-UNIT-0014  claim_recommended  FAIL ◀─┘
 Workflow status COMPLETED · Final outcome CLAIM_RECOMMENDED ($2.00, evidence attached)
 ```
 
-(The stubs' claim rules are illustrative; your Recovery agent decides for real.) Also see [`examples/happy-path/`](examples/happy-path/), [`examples/uncertain-path/`](examples/uncertain-path/), [`examples/failure-path/`](examples/failure-path/).
+(The example is illustrative; the integrated Recovery agent derives the decision from upstream evidence.) Also see [`examples/happy-path/`](examples/happy-path/), [`examples/uncertain-path/`](examples/uncertain-path/), [`examples/failure-path/`](examples/failure-path/).
 
 ## Repository structure
 
@@ -112,7 +118,7 @@ agents/{receiving,prep,pack,returns,recovery}/   app.py · agent.json · README.
 orchestration/       flow.json · orchestrator.py · rollup.py · store.py · clients.py · run.py (CLI) · api.py
 shared/schemas/      agent-input · agent-output · evidence · workflow-state · final-outcome · error
 shared/contracts/    agent-api.md        shared/utils/   hashing · schema validation · record builders · logging · server
-data/input/ (yours) · data/sample/ (Round 2 synthetic CSVs) · data/expected/ (golden outcomes for the stubs)
+data/input/ (captures) · data/sample/ (Round 2 synthetic CSVs) · data/pod/ (team-labelled evaluation cases)
 examples/{happy-path,uncertain-path,failure-path,end-to-end}/      tests/{integration,e2e}/      docs/{build-log,decisions}.md
 ```
 
